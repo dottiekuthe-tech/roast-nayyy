@@ -10,26 +10,31 @@ no randomness, no input. Two runs write byte-identical output.
 import os
 import sys
 
-# Revision note: length gate checked against the kit's 1-200 range, verified
-# from competition.yaml. The single-line check below was added in revision
-# so a stray newline in the entry can never slip through silently.
 LINE = "My agent asked for more context, then used it to confidently build the wrong thing, faster."
-
 
 # Bounty gate: the entry must be one line of 1-200 UTF-8 characters.
 MIN_CHARS = 1
 MAX_CHARS = 200
 
 
-def main() -> None:
-    if not MIN_CHARS <= len(LINE) <= MAX_CHARS:
-        print(
-            f"entry length {len(LINE)} chars outside {MIN_CHARS}-{MAX_CHARS}",
-            file=sys.stderr,
+def validate(line: str) -> str:
+    """Return the line unchanged, or raise with the reason it fails the gate."""
+    if not MIN_CHARS <= len(line) <= MAX_CHARS:
+        raise ValueError(
+            f"entry is {len(line)} characters, outside the {MIN_CHARS}-{MAX_CHARS} range"
         )
-        sys.exit(1)
-    if "\n" in LINE:
-        print("entry must be a single line", file=sys.stderr)
+    if "\n" in line or "\r" in line:
+        raise ValueError("entry must be a single line")
+    if line != line.strip():
+        raise ValueError("entry must not start or end with whitespace")
+    return line
+
+
+def main() -> None:
+    try:
+        entry = validate(LINE)
+    except ValueError as err:
+        print(f"invalid entry: {err}", file=sys.stderr)
         sys.exit(1)
     # Output goes to $MAKEFUN_OUTPUT_DIR/entry.txt in the harness,
     # or /output/entry.txt when run locally by hand.
@@ -37,7 +42,7 @@ def main() -> None:
     os.makedirs(out_dir, exist_ok=True)
     path = os.path.join(out_dir, "entry.txt")
     with open(path, "w", encoding="utf-8") as f:
-        f.write(LINE)
+        f.write(entry)
 
 
 if __name__ == "__main__":
